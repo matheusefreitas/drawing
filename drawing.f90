@@ -12,13 +12,20 @@ module drawing_functions
 
     type DrawingHandler
         real(REAL64) :: origin(3)
-    contains
-        
+    contains    
         procedure :: cuboid
         procedure :: spheroid
     end type
 
     type(DrawingHandler) :: drawing
+
+    type SymetryOperation
+    contains
+        procedure :: rotation
+    end type
+
+    type(SymetryOperation) :: operation
+
 
 contains
 
@@ -117,6 +124,27 @@ contains
         end do
     end subroutine
 
+    subroutine rotation(self, SL, Lx, Ly, Lz)
+
+        class(SymetryOperation) :: self
+        type(Canvas) :: SL
+        integer(INT32) :: Lx, Ly, Lz
+        integer :: i, j, k
+
+        open(10, file = 'lattice3d.dat')
+        do i=1,Lx
+            do j=1,Ly
+                do k=1,Lz
+                    if (SL % nodes (i, j, k) /= 0) then
+                        write (10, *) i,j,k
+                    end if
+                end do
+            end do
+        end do
+        close(10)
+
+    end subroutine
+
 end module
 
 program main
@@ -138,22 +166,12 @@ program main
     allocate(SL % nodes(Lx,Ly,Lz))
     SL % nodes = 0.0_REAL64
 
-    ! Some example drawing function
+    
     call drawing % cuboid(SL, "material_1", origin,       &
                                             a=0.5_REAL64, &
                                             b=0.5_REAL64, &
                                             c=1.0_REAL64)
-    ! Shows the resultant figure
-    open(10, file = 'lattice3d.dat')
-    do i=1,Lx
-        do j=1,Ly
-            do k=1,Lz
-                if (SL % nodes (i, j, k) /= 0) then
-                    write (*, *) i,j,k
-                end if
-            end do
-        end do
-    end do
-    close(10)
+    
+    call operation % rotation(SL, Lx, Ly, Lz)
 
 end program
