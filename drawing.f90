@@ -22,6 +22,7 @@ module drawing_functions
     type SymetryOperation
     contains
         procedure :: rotation
+        procedure :: hexagonal
     end type
 
     type(SymetryOperation) :: operation
@@ -47,9 +48,9 @@ contains
 
     subroutine cuboid(self, SL, material, origin, a, b, c)
 
-        real(REAL64), parameter :: Lx = 20.0_REAL64, &
-                                   Ly = 20.0_REAL64, &
-                                   Lz = 20.0_REAL64
+        real(REAL64), parameter :: Lx = 15.0_REAL64, &
+                                   Ly = 15.0_REAL64, &
+                                   Lz = 15.0_REAL64
         class(DrawingHandler) :: self
         type(Canvas) :: SL
         character(*) :: material
@@ -124,24 +125,55 @@ contains
         end do
     end subroutine
 
-    subroutine rotation(self, SL, Lx, Ly, Lz)
+    subroutine rotation(self, SL, Lx, Ly, Lz, angle, filename)
 
         class(SymetryOperation) :: self
+        character(10) :: filename 
         type(Canvas) :: SL
-        integer(INT32) :: Lx, Ly, Lz
+        integer(INT32) :: Lx, Ly, Lz, angle
         integer :: i, j, k
+        real(REAL64) :: pi = 3.14159265359
+        real :: i_f, j_f, theta
 
-        open(10, file = 'lattice3d.dat')
+        theta = pi*(angle/180.0)
+
+        open(10, file = filename)
         do i=1,Lx
             do j=1,Ly
                 do k=1,Lz
                     if (SL % nodes (i, j, k) /= 0) then
-                        write (10, *) i,j,k
+                        i_f = cos(theta)*real(i) - sin(theta)*real(j)
+                        j_f = sin(theta)*real(i) + cos(theta)*real(j)
+                        write (10, *) i_f, j_f, k
                     end if
                 end do
             end do
         end do
         close(10)
+
+    end subroutine
+
+    subroutine hexagonal(self, SL, Lx, Ly, Lz)
+
+        class(SymetryOperation) :: self
+        type(Canvas) :: SL
+        integer(INT32) :: Lx, Ly, Lz
+        integer :: i, j, k
+        real :: i_f, j_f
+
+        open(11, file = 'lattice3d.dat')
+        do i=1,Lx
+            do j=1,Ly
+                do k=1,Lz
+                    if (SL % nodes (i, j, k) /= 0) then
+                        i_f = real(i) - (0.5)*real(j)
+                        j_f = (sqrt(3.0)/2.0)*real(j)
+                        write (11, *) i_f, j_f, k
+                    end if
+                end do
+            end do
+        end do
+        close(11)
 
     end subroutine
 
@@ -151,10 +183,10 @@ program main
     use drawing_functions
     use iso_fortran_env
     implicit none
-    integer(INT32), parameter :: Lx=20, &
-                                 Ly=20, &
-                                 Lz=20
-    real(REAL64) :: origin(3) = [0.0_REAL64, 0.0_REAL64, 0.0_REAL64]
+    integer(INT32), parameter :: Lx=15, &
+                                 Ly=15, &
+                                 Lz=15
+    real(REAL64) :: origin(3) = [0.5_REAL64, 0.5_REAL64, 0.5_REAL64]
     real(REAL64) :: bounding_box(3) = [1.0_REAL64, 1.0_REAL64, 1.0_REAL64]
     type(Canvas) :: SL
     integer :: i, j, k
@@ -168,10 +200,10 @@ program main
 
     
     call drawing % cuboid(SL, "material_1", origin,       &
-                                            a=0.5_REAL64, &
-                                            b=0.5_REAL64, &
-                                            c=1.0_REAL64)
+                                            a=0.8_REAL64, &
+                                            b=0.8_REAL64, &
+                                            c=0.8_REAL64)
     
-    call operation % rotation(SL, Lx, Ly, Lz)
+    call operation % rotation(SL, Lx, Ly, Lz, 120, "rede01.txt")
 
 end program
