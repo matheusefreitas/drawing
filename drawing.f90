@@ -125,31 +125,35 @@ contains
         end do
     end subroutine
 
-    subroutine rotation(self, SL, Lx, Ly, Lz, angle, filename)
+    subroutine rotation(self, N, angle, file_in, file_out)
 
         class(SymetryOperation) :: self
-        character(10) :: filename 
-        type(Canvas) :: SL
-        integer(INT32) :: Lx, Ly, Lz, angle
-        integer :: i, j, k
-        real(REAL64) :: pi = 3.14159265359
-        real :: i_f, j_f, theta
+        character(*) :: file_in, file_out 
+        integer(INT32) :: N, angle
+        integer :: i
+        real(REAL64), allocatable :: lat_in(:,:), lat_out(:,:)
+        real(REAL64) :: theta, pi = 3.14159265359
+
+        allocate (lat_in(1:3, 1:N))
+        allocate (lat_out(1:3, 1:N))
 
         theta = pi*(angle/180.0)
 
-        open(10, file = filename)
-        do i=1,Lx
-            do j=1,Ly
-                do k=1,Lz
-                    if (SL % nodes (i, j, k) /= 0) then
-                        i_f = cos(theta)*real(i) - sin(theta)*real(j)
-                        j_f = sin(theta)*real(i) + cos(theta)*real(j)
-                        write (10, *) i_f, j_f, k
-                    end if
-                end do
-            end do
+        open(11, file = file_in)
+        open(12, file = file_out)
+
+        do i=1, N
+            read(11, *) lat_in(1, i), lat_in(2, i), lat_in(3, i)
+
+            lat_out(1, i) = cos(theta)*lat_in(1, i) + sin(theta)*lat_in(2, i)
+            lat_out(2, i) = - sin(theta)*lat_in(1, i) + cos(theta)*lat_in(2, i)
+            lat_out(3, i) = lat_in(3, i)
+                
+            write (12, *) lat_out(1, i), lat_out(2, i), lat_out(3, i)
         end do
-        close(10)
+
+        close(11)
+        close(12)
 
     end subroutine
 
@@ -161,13 +165,13 @@ contains
         integer :: i, j, k
         real :: i_f, j_f
 
-        open(11, file = 'lattice3d.dat')
+        open(11, file = 'rede01.txt')
         do i=1,Lx
             do j=1,Ly
                 do k=1,Lz
                     if (SL % nodes (i, j, k) /= 0) then
-                        i_f = real(i) - (0.5)*real(j)
-                        j_f = (sqrt(3.0)/2.0)*real(j)
+                        i_f = real(i) - (0.5)*real(j) - 1.0
+                        j_f = (sqrt(3.0)/2.0)*real(j) - 1.0
                         write (11, *) i_f, j_f, k
                     end if
                 end do
@@ -176,6 +180,27 @@ contains
         close(11)
 
     end subroutine
+
+    integer function count(SL, Lx, Ly, Lz)
+    implicit none
+    type(Canvas) :: SL
+    integer(INT32) :: Lx, Ly, Lz, temp
+    integer :: i, j, k
+    
+    temp = 0
+
+    do i=1,Lx
+        do j=1,Ly
+            do k=1,Lz
+                if (SL % nodes (i, j, k) /= 0) then
+                    temp = temp + 1
+                end if
+            end do
+        end do
+    end do
+    
+    count = temp
+    end function count
 
 end module
 
@@ -189,7 +214,7 @@ program main
     real(REAL64) :: origin(3) = [0.5_REAL64, 0.5_REAL64, 0.5_REAL64]
     real(REAL64) :: bounding_box(3) = [1.0_REAL64, 1.0_REAL64, 1.0_REAL64]
     type(Canvas) :: SL
-    integer :: i, j, k
+    integer :: N
     ! Size of all space in real world units (angstrons for e.g.)
     SL % box_size = bounding_box
     ! Size of all space in voxels (like a pixel but general)
@@ -203,7 +228,13 @@ program main
                                             a=0.8_REAL64, &
                                             b=0.8_REAL64, &
                                             c=0.8_REAL64)
-    
-    call operation % rotation(SL, Lx, Ly, Lz, 120, "rede01.txt")
+
+    N = count(SL, Lx, Ly, Lz)
+
+    call operation % hexagonal(SL, Lx, Ly, Lz)    
+   
+    call operation % rotation(N, 120, 'rede01.txt', 'rede02.txt')
+
+    call operation % rotation(N, 240, 'rede01.txt', 'rede03.txt')
 
 end program
