@@ -23,7 +23,10 @@ module drawing_functions
     contains
         procedure :: rotation
         procedure :: hexagonal
-    end type
+        procedure :: stretch
+        procedure :: reciprocal
+
+end type
 
     type(SymetryOperation) :: operation
 
@@ -163,21 +166,93 @@ contains
         type(Canvas) :: SL
         integer(INT32) :: Lx, Ly, Lz
         integer :: i, j, k
-        real :: i_f, j_f
+        real :: i_f, j_f, pi = 3.141592653589793
 
         open(11, file = 'rede01.txt')
         do i=1,Lx
             do j=1,Ly
                 do k=1,Lz
                     if (SL % nodes (i, j, k) /= 0) then
-                        i_f = real(i) - (0.5)*real(j) - 1.0
+                        i_f = (real(i) - (0.5)*real(j) - 1.0
                         j_f = (sqrt(3.0)/2.0)*real(j) - 1.0
-                        write (11, *) i_f, j_f, k
+                        write (11, *) 2.0*pi*i_f, 2.0*pi*j_f, 2.0*pi*k
                     end if
                 end do
             end do
         end do
         close(11)
+
+    end subroutine
+
+    subroutine stretch(self, N, file_in, file_out)
+
+        class(SymetryOperation) :: self
+        character(*) :: file_in, file_out 
+        integer(INT32) :: N
+        integer :: i
+        real(REAL64), allocatable :: lat_in(:,:), lat_out(:,:)
+        real(REAL64) :: theta, pi = 3.141592653589793,  A(3,3)
+
+        ! that's the transformation array that  will be used at the application of stretch operation
+        
+        A = transpose(reshape((/1.0,0.0,0.0, sqrt(3.0)/3.0,-2.0*sqrt(3.0)/3.0,0.0, 0.0,0.0,1.0/), (/3, 3/)))
+
+        allocate (lat_in(1:3, 1:N))
+        allocate (lat_out(1:3, 1:N))
+
+        open(11, file = file_in)
+        open(12, file = file_out)
+
+        do i=1, N
+            read(11, *) lat_in(1, i), lat_in(2, i), lat_in(3, i)
+
+            lat_out(1, i) = A(1,1)*lat_in(1, i) + A(1,2)*lat_in(2, i) + A(1,3)*lat_in(3, i)
+            lat_out(2, i) = A(2,1)*lat_in(1, i) + A(2,2)*lat_in(2, i) + A(2,3)*lat_in(3, i)
+            lat_out(3, i) = A(3,1)*lat_in(1, i) + A(3,2)*lat_in(2, i) + A(3,3)*lat_in(3, i)
+                
+            write (12, *) lat_out(1, i), lat_out(2, i), lat_out(3, i)
+        end do
+
+        close(11)
+        close(12)
+
+    end subroutine
+
+    subroutine reciprocal(self, SL, Lx, Ly, Lz)
+
+        class(SymetryOperation) :: self
+        type(Canvas) :: SL
+        integer(INT32) :: Lx, Ly, Lz
+        integer :: i, j, k
+	real :: b1(3), b2(3), b3(3), a1(3), a2(3), a3(3), v
+        real(8), parameter   :: pi = 3.141592653589793
+
+        a1 = 2*pi*(/1.0, 0.0, 0.0/)
+        a2 = 2*pi*((/(-1.0/2.0), sqrt(3.0)/2.0, 0.0 /)
+        a3 = 2*pi*((/0.0, 0.0, 1.0/)
+        
+        v = a1(1)*(a2(2)*a3(3)-a2(3)*a3(2))+a1(2)*(a2(3)*a3(1)-a2(1)*a3(3))+a1(3)*(a2(1)*a3(2)-a2(2)*a3(1)); 
+        b1(1) = 2*pi*(a2(2)*a3(3)-a2(3)*a3(2))/v;
+        b1(2) = 2*pi*(a2(3)*a3(1)-a2(1)*a3(3))/v;
+        b1(3) = 2*pi*(a2(1)*a3(2)-a2(2)*a3(1))/v;
+        b2(1) = 2*pi*(a3(2)*a1(3)-a3(3)*a1(2))/v;
+        b2(2) = 2*pi*(a3(3)*a1(1)-a3(1)*a1(3))/v;
+        b2(3) = 2*pi*(a3(1)*a1(2)-a3(2)*a1(1))/v;
+        b3(1) = 2*pi*(a1(2)*a2(3)-a1(3)*a2(2))/v;
+        b3(2) = 2*pi*(a1(3)*a2(1)-a1(1)*a2(3))/v;
+        b3(3) = 2*pi*(a1(1)*a2(2)-a1(2)*a2(1))/v;
+
+        open(14, file = 'rede_recipr.txt')
+        do i=1,Lx
+            do j=1,Ly
+                do k=1,Lz
+                    if (SL % nodes (i, j, k) /= 0) then
+                        write (14, *) i*(b1(:3)) + j*(b2(:3)) + k*(b3(:3))
+                    end if
+                end do
+            end do
+        end do
+        close(14)
 
     end subroutine
 
@@ -236,5 +311,9 @@ program main
     call operation % rotation(N, 120, 'rede01.txt', 'rede02.txt')
 
     call operation % rotation(N, 240, 'rede01.txt', 'rede03.txt')
+
+    call operation % stretch(N, 'rede01.txt', 'rede04.txt')
+    
+    call operation % reciprocal(SL, Lx, Ly, Lz)
 
 end program
