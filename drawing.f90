@@ -22,6 +22,7 @@ module drawing_functions
     type SymetryOperation
     contains
         procedure :: rotation
+        procedure :: cube
         procedure :: hexagonal
         procedure :: stretch
         procedure :: reciprocal
@@ -51,9 +52,9 @@ contains
 
     subroutine cuboid(self, SL, material, origin, a, b, c)
 
-        real(REAL64), parameter :: Lx = 15.0_REAL64, &
-                                   Ly = 15.0_REAL64, &
-                                   Lz = 15.0_REAL64
+        real(REAL64), parameter :: Lx = 20.0_REAL64, &
+                                   Ly = 20.0_REAL64, &
+                                   Lz = 20.0_REAL64
         class(DrawingHandler) :: self
         type(Canvas) :: SL
         character(*) :: material
@@ -160,20 +161,22 @@ contains
 
     end subroutine
 
-    subroutine hexagonal(self, SL, Lx, Ly, Lz)
+    subroutine hexagonal(self, SL)
 
         class(SymetryOperation) :: self
         type(Canvas) :: SL
-        integer(INT32) :: Lx, Ly, Lz
+        integer(INT32) :: L(3)
         integer :: i, j, k
         real :: i_f, j_f, pi = 3.141592653589793
+        
+        L = SL % box_size_voxels
 
         open(11, file = 'rede01.txt')
-        do i=1,Lx
-            do j=1,Ly
-                do k=1,Lz
+        do i=1,L(1)
+            do j=1,L(2)
+                do k=1,L(3)
                     if (SL % nodes (i, j, k) /= 0) then
-                        i_f = (real(i) - (0.5)*real(j) - 1.0
+                        i_f = real(i) - (0.5)*real(j) - 1.0
                         j_f = (sqrt(3.0)/2.0)*real(j) - 1.0
                         write (11, *) 2.0*pi*i_f, 2.0*pi*j_f, 2.0*pi*k
                     end if
@@ -184,18 +187,57 @@ contains
 
     end subroutine
 
-    subroutine stretch(self, N, file_in, file_out)
+    subroutine cube(self, SL)
 
         class(SymetryOperation) :: self
-        character(*) :: file_in, file_out 
+        type(Canvas) :: SL
+        real, parameter :: pi = 3.141592653589793
+        integer(INT32) :: L(3)
+        integer :: i, j, k
+
+        L = SL % box_size_voxels
+
+        open(11, file = 'rede01.txt')
+        do i=1,L(1)
+            do j=1,L(2)
+                do k=1,L(3)
+                    if (SL % nodes (i, j, k) /= 0) then
+                        write (11, *) 2.0*pi*i, 2.0*pi*j, 2.0*pi*k
+                    end if
+                end do
+            end do
+        end do
+        close(11)
+
+    end subroutine
+    subroutine stretch(self, N, latt, file_in, file_out)
+
+        class(SymetryOperation) :: self
+        character(*) :: file_in, file_out
+        character (3) :: latt
         integer(INT32) :: N
         integer :: i
         real(REAL64), allocatable :: lat_in(:,:), lat_out(:,:)
-        real(REAL64) :: theta, pi = 3.141592653589793,  A(3,3)
+        real(REAL64), parameter :: pi = 3.141592653589793
+        real(REAL64) :: A(3,3)
+        real(REAL64) :: det_A
 
         ! that's the transformation array that  will be used at the application of stretch operation
+        if (latt=='cub') then
+
+            A = transpose(reshape((/1d0,0d0,0d0, 0d0,1d0,0d0, 0d0,0d0,1d0/), (/3, 3/)))
+
+        end if
+
+        if (latt=='hex') then
+
+            A = transpose(reshape((/1d0,sqrt(3d0)/3d0,0d0, 0d0, 2d0*sqrt(3d0)/3d0,0d0, 0d0,0d0,1d0/), (/3, 3/)))
         
-        A = transpose(reshape((/1.0,0.0,0.0, sqrt(3.0)/3.0,-2.0*sqrt(3.0)/3.0,0.0, 0.0,0.0,1.0/), (/3, 3/)))
+        end if
+
+        det_A = A(1,3)*A(2,2)*A(3,1) + A(1,2)*A(2,3)*A(3,2) &
+            & + A(1,2)*A(2,1)*A(3,3) - A(1,1)*A(2,2)*A(3,3) &
+            & - A(1,2)*A(2,3)*A(3,1) - A(1,3)*A(2,1)*A(3,2)
 
         allocate (lat_in(1:3, 1:N))
         allocate (lat_out(1:3, 1:N))
@@ -206,9 +248,9 @@ contains
         do i=1, N
             read(11, *) lat_in(1, i), lat_in(2, i), lat_in(3, i)
 
-            lat_out(1, i) = A(1,1)*lat_in(1, i) + A(1,2)*lat_in(2, i) + A(1,3)*lat_in(3, i)
-            lat_out(2, i) = A(2,1)*lat_in(1, i) + A(2,2)*lat_in(2, i) + A(2,3)*lat_in(3, i)
-            lat_out(3, i) = A(3,1)*lat_in(1, i) + A(3,2)*lat_in(2, i) + A(3,3)*lat_in(3, i)
+            lat_out(1, i) = (A(1,1)*lat_in(1, i) + A(1,2)*lat_in(2, i) + A(1,3)*lat_in(3, i))/det_A
+            lat_out(2, i) = (A(2,1)*lat_in(1, i) + A(2,2)*lat_in(2, i) + A(2,3)*lat_in(3, i))/det_A
+            lat_out(3, i) = (A(3,1)*lat_in(1, i) + A(3,2)*lat_in(2, i) + A(3,3)*lat_in(3, i))/det_A
                 
             write (12, *) lat_out(1, i), lat_out(2, i), lat_out(3, i)
         end do
@@ -218,18 +260,20 @@ contains
 
     end subroutine
 
-    subroutine reciprocal(self, SL, Lx, Ly, Lz)
+    subroutine reciprocal(self, SL)
 
         class(SymetryOperation) :: self
         type(Canvas) :: SL
-        integer(INT32) :: Lx, Ly, Lz
+        integer(INT32) :: L(3)
         integer :: i, j, k
 	real :: b1(3), b2(3), b3(3), a1(3), a2(3), a3(3), v
         real(8), parameter   :: pi = 3.141592653589793
 
-        a1 = 2*pi*(/1.0, 0.0, 0.0/)
-        a2 = 2*pi*((/(-1.0/2.0), sqrt(3.0)/2.0, 0.0 /)
-        a3 = 2*pi*((/0.0, 0.0, 1.0/)
+        L = SL % box_size_voxels
+
+        a1 = pi*(/1d0, 0d0, 0d0/)
+        a2 = pi*(/(1d0/2d0), sqrt(3d0)/2d0, 0d0 /)
+        a3 = pi*(/0d0, 0d0, 1d0/)
         
         v = a1(1)*(a2(2)*a3(3)-a2(3)*a3(2))+a1(2)*(a2(3)*a3(1)-a2(1)*a3(3))+a1(3)*(a2(1)*a3(2)-a2(2)*a3(1)); 
         b1(1) = 2*pi*(a2(2)*a3(3)-a2(3)*a3(2))/v;
@@ -243,9 +287,9 @@ contains
         b3(3) = 2*pi*(a1(1)*a2(2)-a1(2)*a2(1))/v;
 
         open(14, file = 'rede_recipr.txt')
-        do i=1,Lx
-            do j=1,Ly
-                do k=1,Lz
+        do i=1,L(1)
+            do j=1,L(2)
+                do k=1,L(3)
                     if (SL % nodes (i, j, k) /= 0) then
                         write (14, *) i*(b1(:3)) + j*(b2(:3)) + k*(b3(:3))
                     end if
@@ -256,17 +300,19 @@ contains
 
     end subroutine
 
-    integer function count(SL, Lx, Ly, Lz)
+    integer function count(SL)
     implicit none
     type(Canvas) :: SL
-    integer(INT32) :: Lx, Ly, Lz, temp
+    integer(INT32) :: L(3), temp
     integer :: i, j, k
     
+    L = SL % box_size_voxels
+
     temp = 0
 
-    do i=1,Lx
-        do j=1,Ly
-            do k=1,Lz
+    do i=1,L(1)
+        do j=1,L(2)
+            do k=1,L(3)
                 if (SL % nodes (i, j, k) /= 0) then
                     temp = temp + 1
                 end if
@@ -283,13 +329,15 @@ program main
     use drawing_functions
     use iso_fortran_env
     implicit none
-    integer(INT32), parameter :: Lx=15, &
-                                 Ly=15, &
-                                 Lz=15
+    integer(INT32), parameter :: Lx=20, &
+                                 Ly=20, &
+                                 Lz=20
     real(REAL64) :: origin(3) = [0.5_REAL64, 0.5_REAL64, 0.5_REAL64]
     real(REAL64) :: bounding_box(3) = [1.0_REAL64, 1.0_REAL64, 1.0_REAL64]
     type(Canvas) :: SL
+    character (3) :: latt
     integer :: N
+
     ! Size of all space in real world units (angstrons for e.g.)
     SL % box_size = bounding_box
     ! Size of all space in voxels (like a pixel but general)
@@ -298,22 +346,17 @@ program main
     allocate(SL % nodes(Lx,Ly,Lz))
     SL % nodes = 0.0_REAL64
 
-    
+    latt ="cub"
+
     call drawing % cuboid(SL, "material_1", origin,       &
                                             a=0.8_REAL64, &
                                             b=0.8_REAL64, &
                                             c=0.8_REAL64)
 
-    N = count(SL, Lx, Ly, Lz)
+    N = count(SL)
 
-    call operation % hexagonal(SL, Lx, Ly, Lz)    
-   
-    call operation % rotation(N, 120, 'rede01.txt', 'rede02.txt')
+    call operation % cube(SL)
 
-    call operation % rotation(N, 240, 'rede01.txt', 'rede03.txt')
-
-    call operation % stretch(N, 'rede01.txt', 'rede04.txt')
-    
-    call operation % reciprocal(SL, Lx, Ly, Lz)
+    call operation % stretch(N, latt, 'rede01.txt', 'rede02.txt')
 
 end program
